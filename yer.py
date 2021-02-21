@@ -49,7 +49,7 @@ from panda3d.core import GraphicsEngine
 
 
 
-import home_made
+import vanilla
 import first_seed
 import time
 from time import perf_counter
@@ -68,7 +68,8 @@ class Yer(DirectObject):
         self.remove_this = 'agent1'
         self.agent_name = 'agent1'        
         self.agent_number = 1
-        # list of food pieces, dictionary {"food id" ,[food object, number of time eaten]}
+        
+        #dict of food pieces, dictionary {"food id" ,[food piece, status, calculated_location, rest_location]}
         self.food_piece_np={}
         # list of agents, dictionary ["agent_name" ,agent object, agent_age, agent energy]
         self.population = []
@@ -81,7 +82,7 @@ class Yer(DirectObject):
         gltf.patch_loader(base.loader)
         # create a rendering window
         wp = WindowProperties()
-        wp.setSize(1000, 1000)
+        wp.setSize(1500, 1500)
         # somehow this is IMPORTANT (requestProperties)
         base.win.requestProperties(wp)
         base.setBackgroundColor(0.1, 0.1, 0.8, 1)
@@ -140,7 +141,12 @@ class Yer(DirectObject):
         self.food_maker()
         self.arrange_food()
 
-    
+    # def get_food_status(self,food):
+    #     return self.food_piece_np[key][1]
+
+    # def set_food_status(self,food,stat):
+    #     self.food_piece_np[key][1]=stat
+
     
     def arrange_food(self):
         for key in self.food_piece_np:
@@ -149,25 +155,16 @@ class Yer(DirectObject):
                 self.food_piece_np[key][0].setPos(self.food_piece_np[key][3])
 
         for key in self.food_piece_np:
+            # number of active food adjusted from here
             if random.random()>.7:
                 self.food_piece_np[key][1] ="active"
                 self.food_piece_np[key][0].setPos(self.food_piece_np[key][2])
 
 
-
-
-        
-    
-    # check every pieces of food in every frame and checks every agents
-    # TODO this could be a yielding fuction, each time we can run it only one of  the piece
-    # I guess it is enough.
-
     def eats(self):
         if self.food_piece_np:
-
             for key in self.food_piece_np:
                 if (self.food_piece_np[key][1] =="active"):
-
                     food =self.food_piece_np[key][0].node()
                     # iterates over all overlapping nodes with that piece which is one most of the time
                     for agent_node in food.getOverlappingNodes():
@@ -191,6 +188,49 @@ class Yer(DirectObject):
                         self.food_piece_np[key][0].setPos(self.food_piece_np[key][3])
 
 
+    def food_maker(self):
+
+            myMaterial = Material()
+            myMaterial.setShininess(5.0) #Make this material shiny
+            myMaterial.setAmbient((1, 0, 1, 1)) #Make this material pink
+
+            for i in range(-60, 61, 12):
+                for j in range(-60, 61,12):
+                    # unique name of the food piece
+                    food_id="Box"+str(i)+str(j)
+                    # shape of the food piece  
+                    shape = BulletBoxShape(Vec3(2, 2 , 2))
+                    # actual object's NodePath
+                    food_piece= self.worldNP.attachNewNode(BulletGhostNode(food_id))
+                    food_piece_node=food_piece.node()
+                    # set the mask to one to prevent contact between terrain and food
+                    food_piece.setCollideMask(BitMask32.bit(1))
+                    food_piece_node.addShape(shape) 
+                    #add node to the world
+                    self.world.attachGhost(food_piece_node)                 
+                    # find terrain surface
+                    pFrom = Point3(i,j,10)
+                    pTo = Point3(i,j,(-50))
+                    # this is the hit object, from food piece(cube) to ground
+                    result = self.world.rayTestClosest(pFrom, pTo)
+                    # this is the active location vector of the food piece
+                    result=LVecBase3(i,j,result.getHitPos()[2]+2)
+                    # this is the passive location vector of the food piece
+                    passive_location= LVecBase3(i,j,-20)
+                    # dict of food pieces, dictionary {"food id" ,[food piece, status, calculated_location, rest_location]}
+                    self.food_piece_np[food_id] = [food_piece,"passive","calculated_location","passive_location"]
+                    # record the active location
+                    self.food_piece_np[food_id][2]=result
+                    # record the passive location
+                    self.food_piece_np[food_id][3]=passive_location
+                    #  set z to -20 to passive position                    
+                    food_piece.setPos(passive_location)
+                    # this is the visual for the cube                     
+                    visualNP = loader.loadModel('models/cube.gltf')
+                    visualNP.set_scale(4)
+                    visualNP.setMaterial(myMaterial)
+                    visualNP.reparentTo(food_piece)
+                    # visualNPList[food_id].reparentTo(self.food_piece_np[food_id][0])
 
 
     def individual_name(self,individual):
@@ -231,67 +271,12 @@ class Yer(DirectObject):
     def save_it(self):
         idx=0
         for brain in self.best_ducks():
-            torch.save(brain.state_dict(),f'home_made_models/{idx}.pt')
+            torch.save(brain.state_dict(),f'vanilla_models/{idx}.pt')
             idx+=1
 
 
    
 
-    def food_maker(self):
-
-            food = OpenSimplex(seed=random.randint(1,100000))
-            visualNPList={}
-
-            myMaterial = Material()
-            myMaterial.setShininess(5.0) #Make this material shiny
-            myMaterial.setAmbient((1, 0, 1, 1)) #Make this material blue
-
-            
-            
-            # based on approxiamate width of the landscape (hard-coded)
-
-            for i in range(-60, 61, 12):
-                for j in range(-60, 61,12):
-                    # 2d noise for scaling
-                    food_scale = food.noise2d(i/50, j/50)
-                    # interpolated between (0-1)
-                    food_scale = interp(food_scale, (-1, 1), (0, 1))
-                    chance = food_scale * np.random.randint(0, 100)
-                    # made it string to keep the consisteny with population dictionary (name,[object,data])
-                    food_id="Box"+str(i)+str(j)                    
-                    
-                    shape = BulletBoxShape(Vec3(1, 1 , 1))
-                    """this row creates a GhostNode and adds '0' as number of bite eaten by agent to a list,
-                    then put this list in a food_piece_np dictionary."""
-                    self.food_piece_np[food_id] = [self.worldNP.attachNewNode(BulletGhostNode(food_id)),"passive","location record",LVecBase3(i,j,-20)]
-                    # initial position for ghost node                 
-                    
-                    self.food_piece_np[food_id][0].node().addShape(shape) 
-                    # set the mask to one to prevent contact between terrain and food
-                    self.food_piece_np[food_id][0].setCollideMask(BitMask32.bit(1))
-                    #add node to the world
-                    self.world.attachGhost(self.food_piece_np[food_id][0].node())                  
-                    
-                    # find terrain surface
-                    pFrom = Point3(i,j,10)
-                    pTo = Point3(i,j,(-50))
-                    # this is the hit object, from food piece(cube) to ground
-                    result = self.world.rayTestClosest(pFrom, pTo)
-                    # this is the future location vector of the food piece
-                    result=LVecBase3(i,j,result.getHitPos()[2]+1)
-                    # record the location
-                    self.food_piece_np[food_id][2]=result
-                    
-            
-                    #  set z to -200 
-                    self.food_piece_np[food_id][0].setPos(i,j,-20)
-                    # this is the visual for the cube                     
-                    visualNPList[food_id] = loader.loadModel('models/cube.gltf')
-                    visualNPList[food_id].set_scale(2)
-
-                    visualNPList[food_id].setMaterial(myMaterial)
-
-                    visualNPList[food_id].reparentTo(self.food_piece_np[food_id][0])
 
 
     def toggleDebug(self):
@@ -318,7 +303,7 @@ class Yer(DirectObject):
         img = PNMImage()
         # couldn't read the files at fist and asked help from the forum. That's why it looks weird.
         assert img.read(getModelPath().findFile(
-            'models/elevation2.png')), "Failed to read!"
+            'models/elevation3.png')), "Failed to read!"
         shape = BulletHeightfieldShape(img, height, ZUp)
         shape.setUseDiamondSubdivision(True)
         np = self.worldNP.attachNewNode(BulletRigidBodyNode('Heightfield'))
@@ -398,9 +383,18 @@ class Yer(DirectObject):
         if self.individual_age(individual)>(80) or self.individual_z(individual)<-10 or self.individual_energy(individual)<0 :
             # self.remove_individual(individual,self.population)
             print(individual)
-            individual[1].brain=self.new_brain()
-            individual[1].my_path.setPos(np.random.randint(-60, 60),
-                              np.random.randint(-60, 60), np.random.randint(1, 3))
+            individual[1].brain=self.new_brain() 
+
+            i=np.random.randint(-35, 35)
+            j=np.random.randint(-35, 35)
+
+            pFrom = Point3(i,j,10)
+            pTo = Point3(i,j,(-50))
+            # this is the hit object, from i,j to ground
+            pos = self.world.rayTestClosest(pFrom, pTo)            
+            z=pos.getHitPos()[2]+1
+
+            individual[1].my_path.setPos(i,j,z)
             individual[1].my_path.setHpr(0,0,0)
             # #individual's energy   
             individual[3]=50
@@ -492,7 +486,7 @@ class Yer(DirectObject):
         
         parent_brain=self.one_of_oldest_ducks()[0][1].brain
         parent_state= copy.deepcopy(parent_brain.state_dict())
-        new_model=home_made.Net()
+        new_model=vanilla.Net()
         new_model.load_state_dict(parent_state)
         use_cuda = torch.cuda.is_available()
         if use_cuda:
@@ -519,9 +513,9 @@ class Yer(DirectObject):
                 #             val+=np.random.normal(loc=0.001, scale=.01)
                 #     node_idx+=1
                 while node_idx < num_nodes:
-                    if random.random() < .001:
+                    if random.random() < .007:
                         for val in parts.weight[node_idx]:
-                            val+=np.random.normal(loc=0.0001, scale=.01)
+                            val+=np.random.normal(loc=0.0008, scale=.01)
                     node_idx+=1
 
 
@@ -628,7 +622,7 @@ class Lillies(Yer):
         fb_prop.setRgbaBits(8, 8, 8, 0)
         fb_prop.setDepthBits(16)
         # Create a WindowProperties object set to 256x256 size.
-        win_prop = WindowProperties.size(36, 36)
+        win_prop = WindowProperties.size(20, 20)
         flags = GraphicsPipe.BF_refuse_window
         # flags = GraphicsPipe.BF_require_window
 
@@ -681,15 +675,15 @@ class Lillies(Yer):
         #     numpy_image_data = np.array(
         #         my_output.getRamImageAs("RGB"), np.float32)
         # # output neural net
-        prediction = home_made.predict(numpy_image_data,self.brain)
+        prediction = vanilla.predict(numpy_image_data,self.brain)
 
-        x_Force = prediction[0][0]
-        y_Force = prediction[0][1]
+        x_Force = prediction[0][0][0][0]
+        y_Force = prediction[0][0][0][1]
         z_Force = 0 #prediction[0][2]
-        z_Torque = prediction[0][3]
+        z_Torque = prediction[0][0][0][2]
 
-        force = Vec3(x_Force, y_Force, z_Force)*60
-        torque = Vec3(0, 0, z_Torque)*5
+        force = Vec3(x_Force, y_Force, z_Force)*60*8
+        torque = Vec3(0, 0, z_Torque)*5*5
 
         force = yer.worldNP.getRelativeVector(self.my_path, force)
         torque = yer.worldNP.getRelativeVector(self.my_path, torque)
@@ -723,8 +717,8 @@ class LilliesManual(Yer):
         fb_prop.setDepthBits(16)
         # Create a WindowProperties object set to 256x256 size.
         win_prop = WindowProperties.size(128, 128)
-        # flags = GraphicsPipe.BF_refuse_window
-        flags = GraphicsPipe.BF_require_window
+        flags = GraphicsPipe.BF_refuse_window
+        # flags = GraphicsPipe.BF_require_window
 
         lens = PerspectiveLens()
         self.my_buff = base.graphicsEngine.make_output(
@@ -800,7 +794,7 @@ yer = Yer()
 agent0 = yer.agent_zero(LilliesManual)
 
 # first load after startup
-brains=home_made.model_loader()
+brains=vanilla.model_loader()
 for brain in brains:
     
     agent=Lillies(yer.agent_name,brain)
