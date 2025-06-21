@@ -2,7 +2,7 @@ import torch.nn as nn
 import torch
 import numpy as np
 import torchvision.transforms as transforms
-import pretrainedmodels
+#import pretrainedmodels
 
 class Resnet18(nn.Module):
     def __init__(self):

@@ -18,7 +18,7 @@ class Net(nn.Module):
     def forward(self, x):
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
-        x = F.tanh(self.fc3(x))
+        x = torch.tanh(self.fc3(x))
         # x = F.softmax(x, dim=1)
         return x
 
@@ -31,26 +31,11 @@ model = Net()
 train_on_gpu = torch.cuda.is_available()
 
 # move tensors to GPU if CUDA is available
-# if train_on_gpu:
-#     model.cuda()
-# # model.eval()
+if train_on_gpu:
+    model.cuda()
+model.eval()
 
-def model_loader():
-    model_list=[]
-    use_cuda = torch.cuda.is_available()
-    
-    for i in range(20):
-        model_list.append(Net())
-        model_list[i].load_state_dict(torch.load(f'vanilla_models/{i%5}.pt'))
-    # print(model_list)    
-    for model in model_list:
-        for param in model.parameters():
-            param.requires_grad = False
-        model.eval()
-        if use_cuda:
-            model = model.cuda()
-            
-    return model_list
+
 
 
 def predict(np_im,model):
@@ -99,7 +84,7 @@ def process_image(np_im):
     transformations = transforms.Compose([transforms.ToTensor()])
     torch_image = transformations(np_im).float()    
     return torch_image
-
+    
 use_cuda = torch.cuda.is_available()
-torch.save(model.state_dict(),f'vanilla_models/000.pt')
+torch.save(model.state_dict(),f'lab_vanilla_models/000.pt')
 print(model)

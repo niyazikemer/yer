@@ -28,7 +28,7 @@ from panda3d.core import Camera
 from panda3d.core import PerspectiveLens
 from panda3d.core import Material
 from direct.gui.DirectGui import *
-import gltf
+#import gltf
 # from panda3d.core import PandaNode
 
 from panda3d.core import FrameBufferProperties
@@ -53,7 +53,7 @@ import vanilla
 import first_seed
 import time
 from time import perf_counter
-from opensimplex import OpenSimplex
+
 
 
 base = ShowBase()
@@ -79,7 +79,7 @@ class Yer(DirectObject):
         
         self.best_brains=[]
         #gltf loader instead of native loader (must be installed first)
-        gltf.patch_loader(base.loader)
+        #gltf.patch_loader(base.loader)
         # create a rendering window
         wp = WindowProperties()
         wp.setSize(1500, 1500)
@@ -112,6 +112,7 @@ class Yer(DirectObject):
 
         
         taskMgr.doMethodLater(30*60, self.brain_save, 'checker')
+        
         taskMgr.doMethodLater(2*60, self.thirty, 'thirty')
         
         
@@ -225,11 +226,13 @@ class Yer(DirectObject):
                     self.food_piece_np[food_id][3]=passive_location
                     #  set z to -20 to passive position                    
                     food_piece.setPos(passive_location)
-                    # this is the visual for the cube                     
-                    visualNP = loader.loadModel('models/cube.gltf')
-                    visualNP.set_scale(4)
-                    visualNP.setMaterial(myMaterial)
-                    visualNP.reparentTo(food_piece)
+                    # this is the visual for the cube 
+                #   These changed in 2024 (tabbed comments)                 
+                    visualNP = loader.loadModel('models/lilly.gltf')
+                    #visualNP = gltf.load_model('models/lilly.gltf')
+                #    visualNP.set_scale(4)
+                #    visualNP.setMaterial(myMaterial)
+                #   visualNP.reparentTo(food_piece)
                     # visualNPList[food_id].reparentTo(self.food_piece_np[food_id][0])
 
 
@@ -303,7 +306,7 @@ class Yer(DirectObject):
         img = PNMImage()
         # couldn't read the files at fist and asked help from the forum. That's why it looks weird.
         assert img.read(getModelPath().findFile(
-            'models/elevation3.png')), "Failed to read!"
+            'models/elevation2.png')), "Failed to read!"
         shape = BulletHeightfieldShape(img, height, ZUp)
         shape.setUseDiamondSubdivision(True)
         np = self.worldNP.attachNewNode(BulletRigidBodyNode('Heightfield'))
@@ -631,6 +634,7 @@ class Lillies(Yer):
             base.pipe, yer.agent_name+"_buffer", -100, fb_prop, win_prop, flags, base.win.getGsg(), base.win)
         my_cam = base.makeCamera(self.my_buff, sort=6, displayRegion=(
             0.0, 1, 0, 1), camName=yer.agent_name+"_cam")
+        
         my_cam.setHpr(0, 0, 0)
         my_cam.setPos(0, 0, 1)
         my_cam.node().setLens(lens)
@@ -708,7 +712,7 @@ class LilliesManual(Yer):
         # self.y_Force=0
         # self.z_Force=0
         # self.z_Torque=0
-
+        
         fb_prop = FrameBufferProperties()
         # Request 8 RGB bits, no alpha bits, and a depth buffer.
         fb_prop.setRgbColor(True)
@@ -729,6 +733,7 @@ class LilliesManual(Yer):
         my_cam.setPos(0, 0, 1)
         my_cam.node().setLens(lens)
         lens.setFov(100)
+        
 
         # make body of the agent
 
@@ -808,7 +813,7 @@ print(len(yer.population))
 
 
 
-#f = yer.food_maker()
+f = yer.food_maker()
 
 
 """
